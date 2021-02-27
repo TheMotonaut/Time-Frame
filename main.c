@@ -14,7 +14,18 @@
 #include <math.h>
 
 #define F_CPU 16000000UL
-#define BASE_FREQ 80.0
+
+#include <util/delay.h>
+
+#define BASE_FREQ 70.0
+#define FREQ_SHIFT 3.0
+#define OUTPUT 0x0F
+
+
+void shift_freq2(void);
+void shift_freq(void);
+void led_init(void);
+void magnet_init(void);
 
 ISR (TIMER0_COMPA_vect){
 	PORTD |= (1 << PD2)|(1 << PD1)|(1 << PD0);
@@ -42,36 +53,81 @@ int main(void){
 	//CLKPR = (1 << CLKPCE)|(0 << CLKPS3)|(0 << CLKPS2)|(0 << CLKPS1)|(0 << CLKPS0);
 	//CLKPR = (0 << CLKPS3)|(0 << CLKPS2)|(0 << CLKPS1)|(0 << CLKPS0);
 
-	DDRD = 0xFF; //LEDs and Magnet output set as outputs
+	DDRD = OUTPUT;
 	
-	float freq_magn = BASE_FREQ;
-	float dutyc_magn = 1.0; //Percent
-	long time_magn = round(F_CPU/1024/freq_magn);
-	
-	float freq_led = BASE_FREQ+0.5; //Plus freq shift
-	float dutyc_led = 1;  //Percent
-	float time_led = round((F_CPU/1024)/freq_led);
+	led_init();
+	magnet_init();
 
-	OCR0A = round(time_led);
-	OCR0B = round(time_led+dutyc_led*time_led); //Ändra så dutycycle ofrekvens blir rätt med summan
-	TCCR0A = 0;
-	TCCR0B = 0;
-	TCCR0B = (1 << CS01)|(1 << CS00);		//Prescaler 1024
-	TIMSK0 = (1 << OCIE0A)|(1 << OCIE0B);	//Cause interupt on flag
-	
-
-	OCR2A = round(time_magn);
-	OCR2B = round(time_magn+dutyc_magn*time_magn);
-	TCCR2A = 0;
-	TCCR2B = 0;
-	TCCR2B = (1 << CS22)|(1 << CS21);		//Prescaler 1024
-	TIMSK2 = (1 << OCIE2B)|(1 << OCIE2A);	//Cause interupt on flag
-	
 	sei();
 	
 	while(1)
 	{
+		
+		//shift_freq2();
 		continue;
 	}
 }
 
+void led_init(){
+	float freq_led = BASE_FREQ + FREQ_SHIFT;				//Plus freq shift
+	float dutyc_led = 0.05;						//Duty-cycle, scales brightness. Strobe effect removed on too high brightness
+	float time_led = round((F_CPU/1024)/freq_led);
+
+	OCR0A = round(time_led-dutyc_led*time_led);
+	OCR0B = round(time_led);
+	TCCR0A = 0;
+	TCCR0B = 0;
+	TCCR0B = (1 << CS01)|(1 << CS00);
+	TIMSK0 = (1 << OCIE0A)|(1 << OCIE0B);		//Cause interupt on flag
+}
+
+void magnet_init(){
+	float freq_magn = BASE_FREQ;
+	float dutyc_magn = 0.6;						//Duty-cycle
+	long time_magn = round(F_CPU/1024/freq_magn);
+	
+	OCR2A = round(time_magn-dutyc_magn*time_magn);
+	OCR2B = round(time_magn);
+	TCCR2A = 0;
+	TCCR2B = 0;
+	TCCR2B = (1 << CS22);						
+	TIMSK2 = (1 << OCIE2B)|(1 << OCIE2A);		//Cause interupt on flag
+}
+
+void shift_freq2(){
+	static int i = 0;
+	float freq_led = BASE_FREQ;			//Plus freq shift
+	float dutyc_led = 0.05;						//Duty-cycle, scales brightness. Strobe effect removed on too high brightness
+	float time_led = round((F_CPU/1024)/freq_led);
+	
+	freq_led = BASE_FREQ + 10 * sin(i/1000.0);
+	
+	OCR0A = round(time_led-dutyc_led*time_led);
+	OCR0B = round(time_led);
+	
+	i++;
+
+}
+
+void shift_freq(){
+	int i;
+	for (i = 10; i < 50; i++){
+		float freq_led = BASE_FREQ + i/10;				//Plus freq shift
+		float dutyc_led = 0.05;						//Duty-cycle, scales brightness. Strobe effect removed on too high brightness
+		float time_led = round((F_CPU/1024)/freq_led);
+				
+		OCR0A = round(time_led-dutyc_led*time_led);
+		OCR0B = round(time_led);
+		_delay_ms(10);
+	}
+	int j;
+	for (j = 50; j > 10; j--){
+		float freq_led = BASE_FREQ + j/10;				//Plus freq shift
+		float dutyc_led = 0.05;						//Duty-cycle, scales brightness. Strobe effect removed on too high brightness
+		float time_led = round((F_CPU/1024)/freq_led);
+				
+		OCR0A = round(time_led-dutyc_led*time_led);
+		OCR0B = round(time_led);
+		_delay_ms(10);
+	}
+} 
