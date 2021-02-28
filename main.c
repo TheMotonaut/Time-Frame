@@ -18,9 +18,8 @@
 #include <util/delay.h>
 
 #define BASE_FREQ 70.0
-#define FREQ_SHIFT 3.0
-#define OUTPUT 0x0F
-
+#define FREQ_SHIFT 2.0
+#define STROBE_CTRL 0x0F // Outputs for leds and magnet
 
 void shift_freq2(void);
 void shift_freq(void);
@@ -49,28 +48,44 @@ ISR (TIMER2_COMPB_vect){
 
 int main(void){
 	cli();
-	
-	//CLKPR = (1 << CLKPCE)|(0 << CLKPS3)|(0 << CLKPS2)|(0 << CLKPS1)|(0 << CLKPS0);
-	//CLKPR = (0 << CLKPS3)|(0 << CLKPS2)|(0 << CLKPS1)|(0 << CLKPS0);
 
-	DDRD = OUTPUT;
+	DDRD = STROBE_CTRL; // Set magnet and led pins as output
+	DDRB = 0; //PortB as inputs
+	
+	PORTB |= (1 << PB0)|(1 << PB2); //Pull-up on PB0 and PB2
 	
 	led_init();
 	magnet_init();
 
 	sei();
 	
-	while(1)
-	{
+	while(1){
+		/*
+		int i = (PINB & (1 << PB0)|(1 << PB2));
 		
-		//shift_freq2();
+		switch (i) {
+			case 0:
+				break;
+			case 1:
+				shift_freq();
+				break;
+			case 4:
+				shift_freq();
+				break;
+			case 5:
+				shift_freq();
+				break;
+			default:
+				break;
+		}
+		*/
 		continue;
 	}
 }
 
 void led_init(){
 	float freq_led = BASE_FREQ + FREQ_SHIFT;				//Plus freq shift
-	float dutyc_led = 0.05;						//Duty-cycle, scales brightness. Strobe effect removed on too high brightness
+	float dutyc_led = 0.2;						//Duty-cycle, scales brightness. Strobe effect removed on too high brightness
 	float time_led = round((F_CPU/1024)/freq_led);
 
 	OCR0A = round(time_led-dutyc_led*time_led);
@@ -94,20 +109,6 @@ void magnet_init(){
 	TIMSK2 = (1 << OCIE2B)|(1 << OCIE2A);		//Cause interupt on flag
 }
 
-void shift_freq2(){
-	static int i = 0;
-	float freq_led = BASE_FREQ;			//Plus freq shift
-	float dutyc_led = 0.05;						//Duty-cycle, scales brightness. Strobe effect removed on too high brightness
-	float time_led = round((F_CPU/1024)/freq_led);
-	
-	freq_led = BASE_FREQ + 10 * sin(i/1000.0);
-	
-	OCR0A = round(time_led-dutyc_led*time_led);
-	OCR0B = round(time_led);
-	
-	i++;
-
-}
 
 void shift_freq(){
 	int i;
