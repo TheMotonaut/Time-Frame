@@ -17,7 +17,7 @@
 
 #include <util/delay.h>
 
-#define BASE_FREQ 70.0
+#define BASE_FREQ 68.0
 #define FREQ_SHIFT 2.0
 #define STROBE_CTRL 0x0F // Outputs for leds and magnet
 
@@ -25,6 +25,9 @@ void shift_freq2(void);
 void shift_freq(void);
 void led_init(void);
 void magnet_init(void);
+void rgb_init(void);
+
+unsigned int program = 0;
 
 ISR (TIMER0_COMPA_vect){
 	PORTD |= (1 << PD2)|(1 << PD1)|(1 << PD0);
@@ -33,6 +36,7 @@ ISR (TIMER0_COMPA_vect){
 ISR	(TIMER0_COMPB_vect){
 	PORTD &= ~((1 << PD2)|(1 << PD1)|(1 << PD0));
 	TCNT0 = 0;
+	TCNT1 = 0;
 }
 
 ISR (TIMER2_COMPA_vect){
@@ -43,6 +47,15 @@ ISR (TIMER2_COMPB_vect){
 	PORTD &= ~(1 << PD3);
 	TCNT2 = 0;
 }
+
+ISR (TIMER1_COMPB_vect){
+	PORTD &= ~(1 << PD1);
+}
+
+ISR (TIMER1_COMPA_vect){
+	PORTD &= ~(1 << PD2);
+}
+
 
 
 
@@ -56,31 +69,12 @@ int main(void){
 	
 	led_init();
 	magnet_init();
+	rgb_init();
 
 	sei();
 	
-	while(1){
-		/*
-		int i = (PINB & (1 << PB0)|(1 << PB2));
-		
-		switch (i) {
-			case 0:
-				break;
-			case 1:
-				shift_freq();
-				break;
-			case 4:
-				shift_freq();
-				break;
-			case 5:
-				shift_freq();
-				break;
-			default:
-				break;
-		}
-		*/
-		continue;
-	}
+	while(1);
+	
 }
 
 void led_init(){
@@ -96,9 +90,25 @@ void led_init(){
 	TIMSK0 = (1 << OCIE0A)|(1 << OCIE0B);		//Cause interupt on flag
 }
 
+void rgb_init(){
+	float freq_led = BASE_FREQ + FREQ_SHIFT;
+	float dutyc_led = 0.2;
+	float rgb_cali1 = 0.8;
+	float rgb_cali2 = 0.1;
+	float time_led = round((F_CPU/1024)/freq_led);
+
+	OCR1A = round(time_led - rgb_cali1 * dutyc_led * time_led);
+	OCR1B = round(time_led - rgb_cali2 * dutyc_led * time_led);
+	TCCR1A = 0;
+	TCCR1B = 0;
+	TCCR1C = 0;
+	TCCR1B = (1 << CS11)|(1 << CS10);
+	TIMSK1 = (1 << OCIE1A)|(1 << OCIE1B);
+}
+
 void magnet_init(){
 	float freq_magn = BASE_FREQ;
-	float dutyc_magn = 0.6;						//Duty-cycle
+	float dutyc_magn = 0.2;						//Duty-cycle
 	long time_magn = round(F_CPU/1024/freq_magn);
 	
 	OCR2A = round(time_magn-dutyc_magn*time_magn);
